@@ -439,7 +439,7 @@ const shouldSuppressContentLayoutTransitions = computed(
 	() => !isPreviewPanelTransitionEnabled.value,
 );
 const artifactsPanelSlotRef = useTemplateRef<HTMLElement>('artifactsPanelSlot');
-const previewPanelWidth = ref(Math.round(threadAreaWidth.value / 2));
+const preferredPreviewPanelWidth = ref<number>();
 const isResizingPreview = ref(false);
 const isPreviewExpanded = ref(false);
 const isAgentPreviewDockOpen = ref(false);
@@ -451,6 +451,11 @@ watch(preview.activeTabId, (activeTabId, previousActiveTabId) => {
 });
 
 const previewMaxWidth = computed(() => Math.round(threadAreaWidth.value / 2));
+// Preserve a manually selected width while temporarily constraining it to the
+// available space. Without a preference, keep following the 50% default.
+const previewPanelWidth = computed(() =>
+	Math.min(preferredPreviewPanelWidth.value ?? previewMaxWidth.value, previewMaxWidth.value),
+);
 // Keep the artifact at its current width and split the remaining space evenly
 // between the Instance AI chat and the agent preview chat.
 const agentPreviewChatColumnWidth = computed(() =>
@@ -486,16 +491,8 @@ function handleAgentPreviewDockOpenChange(open: boolean) {
 	}
 }
 
-// Clamp preview width when the available area shrinks (sidebar open, window
-// resize, etc.)
-watch(previewMaxWidth, (max) => {
-	if (previewPanelWidth.value > max) {
-		previewPanelWidth.value = max;
-	}
-});
-
 function handlePreviewResize({ width }: { width: number }) {
-	previewPanelWidth.value = width;
+	preferredPreviewPanelWidth.value = width;
 }
 
 function handlePreviewPanelAfterEnter() {
@@ -520,21 +517,13 @@ watch(
 
 		if (visible) {
 			isArtifactsPanelRevealed.value = false;
-			previewPanelWidth.value = Math.round(threadAreaWidth.value / 2);
+			preferredPreviewPanelWidth.value = undefined;
 		} else {
 			isAgentPreviewDockOpen.value = false;
 		}
 	},
 	{ flush: 'sync' },
 );
-
-// Late-initialize if the panel became visible before the ResizeObserver
-// reported the container size (otherwise the panel would render at 0px).
-watch(threadAreaWidth, (width) => {
-	if (width > 0 && previewPanelWidth.value === 0 && preview.isPreviewVisible.value) {
-		previewPanelWidth.value = Math.round(width / 2);
-	}
-});
 
 watch(isArtifactsPanelInLayout, (isInLayout) => {
 	isArtifactsPanelRevealed.value = false;
